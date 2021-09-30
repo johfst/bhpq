@@ -1,23 +1,26 @@
 #![allow(dead_code)]
 use std::collections::LinkedList;
+use std::error::Error;
+use std::cmp::min;
+use std::fmt;
 
 #[derive(Debug)]
 pub struct BHPQ<T> {
     top: Option<usize>,
-    max_priority: usize,
+    priority_slots: usize,
     len: u32,
     array: Vec<LinkedList<T>>,
 }
 
-pub impl<T> BHPQ<T> {
-    pub fn new(max_priority: usize) -> BHPQ<T> {
+impl<T> BHPQ<T> {
+    pub fn new(priority_slots: usize) -> BHPQ<T> {
         let mut bhpq = BHPQ::<T> {
             top: None,
-            max_priority,
+            priority_slots,
             len: 0,
-            array: Vec::<LinkedList<T>>::with_capacity(max_priority-1),
+            array: Vec::<LinkedList<T>>::with_capacity(priority_slots),
         };
-        for _ in 0..max_priority {
+        for _ in 0..priority_slots {
             bhpq.array.push(LinkedList::<T>::new());
         }
         //bhpq.array.resize_with(size, LinkedList::<T>);
@@ -25,13 +28,13 @@ pub impl<T> BHPQ<T> {
     }
 
     pub fn push(&mut self, priority: usize, value: T) -> Result<(), PriorityError> {
-        //if priority > self.max_priority
+        //if priority >= self.priority_slots, error
         self.get_priority_mut(priority)?.push_front(value);
         self.len += 1;
 
         match self.top {
             None => self.top = Some(priority),
-            Some(k) => self.top = Some(std::cmp::min(k, priority)),
+            Some(k) => self.top = Some(min(k, priority)),
         };
         Ok(())
     }
@@ -49,7 +52,7 @@ pub impl<T> BHPQ<T> {
     }
 
     fn search_top(&self, start: usize) -> Option<usize> {
-        for k in start..self.max_priority {
+        for k in start..self.priority_slots {
             if !self.array[k].is_empty() { return Some(k) };
         }
         return None;
@@ -85,15 +88,23 @@ pub impl<T> BHPQ<T> {
 
     pub fn get_priority_mut(&mut self, priority: usize) 
         -> Result<&mut LinkedList<T>, PriorityError> {
-        if priority > self.max_priority { 
+        if priority >= self.priority_slots { 
             Err(PriorityError::new(priority))
         } else { Ok(&mut self.array[priority]) }
     }
 
     pub fn get_priority(&self, priority: usize) -> Result<&LinkedList<T>, PriorityError> {
-        if priority > self.max_priority { 
+        if priority >= self.priority_slots { 
             Err(PriorityError::new(priority))
         } else { Ok(&self.array[priority]) }
+    }
+}
+
+impl<T> Iterator for BHPQ<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        self.pop()
     }
 }
 
@@ -108,21 +119,11 @@ impl PriorityError {
     }
 }
 
-
-/*
-fn main() -> Result<(), PriorityError> {
-    let mut bhpq = BHPQ::<String>::new(2);
-    bhpq.push(3, String::from("c"))?;
-    bhpq.push(4, String::from("d"))?;
-    bhpq.push(1, String::from("a"))?;
-    bhpq.push(3, String::from("cat"))?;
-    println!("bhpq: {:?}", bhpq);
-    println!("empty? {}", bhpq.is_empty());
-    if let Some(val) = bhpq.pop() {
-        println!("pop: {}", val);
+impl fmt::Display for PriorityError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "tried to push priority {} larger than upper bound", self.priority)
     }
-    println!("bhpq: {:?}", bhpq);
-    bhpq.clear();
-    Ok(())
 }
-*/
+
+impl Error for PriorityError {}
+
